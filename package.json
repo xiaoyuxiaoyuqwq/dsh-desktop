@@ -108,8 +108,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "dsh 简易封装",
-      "runAfterFinish": true,
-      "requestedExecutionLevel": "requireAdministrator"
+      "runAfterFinish": true
     }
   }
 }
