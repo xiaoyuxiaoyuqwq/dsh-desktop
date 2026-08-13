@@ -5,12 +5,58 @@
   "description": "DeepSeek Harness desktop shell (Electron wrapper around `dsh web`)",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "gen:icon": "node scripts/gen-icon.mjs",
+    "build": "node scripts/gen-icon.mjs && electron-builder --win"
   },
   "dependencies": {
     "@deepseek-ai/dsh": "^0.1.0-rc.6"
   },
   "devDependencies": {
-    "electron": "^43.4.0"
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3",
+    "png-to-ico": "^2.1.8",
+    "sharp": "^0.34.0"
+  },
+  "build": {
+    "appId": "ai.deepseek.dsh.desktop",
+    "productName": "DeepSeek Harness",
+    "asar": false,
+    "npmRebuild": false,
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "loading.html",
+      "preload.js",
+      "build/icon.png",
+      "node_modules/*"
+    ],
+    "extraResources": [
+      {
+        "from": "portable-node",
+        "to": "portable-node"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DeepSeek Harness"
+    }
   }
 }

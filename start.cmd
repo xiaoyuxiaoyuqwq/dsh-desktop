@@ -1,4 +1,5 @@
 @echo off
+setlocal
 chcp 65001 >nul
 cd /d "%~dp0"
 
@@ -8,5 +9,5 @@ if not exist "node_modules\electron" (
   exit /b 1
 )
 
-echo 正在启动 dsh-desktop ...
+echo 正在启动 DeepSeek Harness ...
 start "" node_modules\.bin\electron.cmd .
