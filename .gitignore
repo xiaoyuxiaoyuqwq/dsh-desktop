@@ -1,0 +1,4 @@
+node_modules/
+portable-node/
+*.log
+.DS_Store
