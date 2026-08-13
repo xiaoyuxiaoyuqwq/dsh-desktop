@@ -1,6 +1,9 @@
-# dsh 简易封装
+# dsh 简易封装（纯净版）
 
 一个很轻的 Electron 壳，把 `dsh web` 套进桌面窗口里，省得自己开浏览器。支持在窗口右下角提示 dsh 更新。
+
+> 本分支为**纯净版**：只做窗口封装 + 自动更新角标，不带右侧控制面板等附加功能。
+> 需要 Skill / 插件管理面板的，请使用增强版（main 分支）：https://github.com/xiaoyuxiaoyuqwq/dsh-desktop
 
 ## 安装
 
