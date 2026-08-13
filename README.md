@@ -12,12 +12,17 @@ DeepSeek Harness 的桌面壳。用 Electron 内嵌 `dsh web`，像 opencode 桌
 
 ## 安装
 
-### 方式一：安装程序（推荐）
+### 方式一：zip 便携版（推荐）
 
 从 [GitHub Releases](https://github.com/xiaoyuxiaoyuqwq/dsh-desktop/releases) 下载
-`DeepSeek Harness Setup X.X.X.exe`，双击安装即可。安装时会自动创建桌面快捷方式。
+`DeepSeek Harness-*-win.zip`，解压后双击 `DeepSeek Harness.exe` 即用，免安装、启动更快。
 
-### 方式二：源码运行
+### 方式二：安装程序
+
+从 [GitHub Releases](https://github.com/xiaoyuxiaoyuqwq/dsh-desktop/releases) 下载
+`DeepSeek Harness Setup X.X.X.exe`，双击安装，自动创建桌面快捷方式。
+
+### 方式三：源码运行
 
 ```
 setup.cmd    一键安装（检测 Node、装依赖）
