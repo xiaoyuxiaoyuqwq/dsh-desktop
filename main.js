@@ -134,12 +134,14 @@ function isDevModeEnabled() {
 }
 
 function enableDevModeViaUac() {
-  const cmd = 'reg add "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock" /v AllowDevelopmentWithoutDevLicense /t REG_DWORD /d 1 /f';
-  const ps = spawn('powershell', ['-NoProfile', '-Command', `Start-Process reg -ArgumentList 'add','HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock','/v','AllowDevelopmentWithoutDevLicense','/t','REG_DWORD','/d','1','/f' -Verb RunAs -Wait`], {
+  const bat = path.join(app.getPath('temp'), 'enable-dev-mode.bat');
+  fs.writeFileSync(bat, '@echo off\r\nreg add "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock" /v AllowDevelopmentWithoutDevLicense /t REG_DWORD /d 1 /f\r\n', 'utf8');
+  const ps = spawn('powershell', ['-NoProfile', '-Command', `Start-Process cmd -ArgumentList '/c','"${bat}"' -Verb RunAs -Wait`], {
     windowsHide: true,
     stdio: 'ignore',
   });
-  ps.on('exit', (code) => {
+  ps.on('exit', () => {
+    fs.unlinkSync(bat);
     const ok = isDevModeEnabled();
     if (ok && win && !win.isDestroyed()) {
       dialog.showMessageBox(win, {
@@ -148,7 +150,7 @@ function enableDevModeViaUac() {
         detail: '正在重新启动 dsh…',
       });
       restartDsh();
-    } else {
+    } else if (win && !win.isDestroyed()) {
       dialog.showMessageBox(win, {
         type: 'warning',
         message: '未能开启开发者模式',
@@ -340,6 +342,202 @@ function startUpdateChecks() {
   checkForUpdate();
   updateTimer = setInterval(() => checkForUpdate(), 1000 * 60 * 60 * 3);
 }
+
+const DSH_HOME = process.env.DSH_HOME || path.join(app.getPath('home'), '.dsh');
+const PROFILE_DIR = path.join(DSH_HOME, 'profiles', 'web');
+const PATCH_FILE = path.join(PROFILE_DIR, 'cordis.patch.yml');
+
+function readYamlSafe(p) {
+  try {
+    const raw = fs.readFileSync(p, 'utf8');
+    const rows = raw.split(/\r?\n/);
+    const out = [];
+    for (const line of rows) {
+      const t = line.trim();
+      if (t === '-' || t === '[]' || t === '#' || t.startsWith('#')) continue;
+      if (t.startsWith('-')) {
+        out.push({ raw: line, indent: line.match(/^ */)[0].length });
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function listSkills() {
+  const roots = [path.join(DSH_HOME, 'skills')];
+  const out = [];
+  for (const root of roots) {
+    if (!fs.existsSync(root)) continue;
+    let entries = [];
+    try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch { continue; }
+    for (const e of entries) {
+      const full = path.join(root, e.name);
+      let name = e.name, desc = '', enabled = true;
+      if (e.isDirectory()) {
+        const md = path.join(full, 'SKILL.md');
+        if (!fs.existsSync(md)) continue;
+        try {
+          const head = fs.readFileSync(md, 'utf8').slice(0, 2000);
+          const m = head.match(/^name:\s*["']?([^"'\r\n]+)/m);
+          if (m) name = m[1].trim();
+          const d = head.match(/^description:\s*["']?([^"'\r\n]+)/m);
+          if (d) desc = d[1].trim();
+        } catch {}
+      } else if (e.name.endsWith('.md')) {
+        name = e.name.replace(/\.md$/, '');
+        try {
+          const head = fs.readFileSync(full, 'utf8').slice(0, 2000);
+          const d = head.match(/^description:\s*["']?([^"'\r\n]+)/m);
+          if (d) desc = d[1].trim();
+        } catch {}
+      } else continue;
+      const disabledFile = path.join(full, '.disabled');
+      enabled = !fs.existsSync(disabledFile);
+      out.push({ name, desc, enabled, path: full, source: 'user' });
+    }
+  }
+  return out;
+}
+
+function listOpencodeSkills() {
+  const dirs = [
+    path.join(app.getPath('home'), '.config', 'opencode', 'skills'),
+  ];
+  const out = [];
+  for (const root of dirs) {
+    if (!fs.existsSync(root)) continue;
+    let entries = [];
+    try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch { continue; }
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const md = path.join(root, e.name, 'SKILL.md');
+      if (!fs.existsSync(md)) continue;
+      let name = e.name, desc = '';
+      try {
+        const head = fs.readFileSync(md, 'utf8').slice(0, 2000);
+        const m = head.match(/^name:\s*["']?([^"'\r\n]+)/m);
+        if (m) name = m[1].trim();
+        const d = head.match(/^description:\s*["']?([^"'\r\n]+)/m);
+        if (d) desc = d[1].trim();
+      } catch {}
+      out.push({ name, desc, enabled: true, path: md, source: 'opencode', readonly: true });
+    }
+  }
+  return out;
+}
+
+function setSkillEnabled(name, enabled) {
+  const root = path.join(DSH_HOME, 'skills');
+  if (!fs.existsSync(root)) return false;
+  const full = path.join(root, name);
+  const disabledFile = path.join(root, name, '.disabled');
+  if (enabled) {
+    if (fs.existsSync(disabledFile)) fs.unlinkSync(disabledFile);
+  } else {
+    try { fs.writeFileSync(disabledFile, 'disabled\n'); } catch { return false; }
+  }
+  return true;
+}
+
+function listPlugins() {
+  const plugins = [];
+  const loaded = [];
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(PROFILE_DIR, 'package.json'), 'utf8'));
+    loaded.push(...(pkg.dsh?.profile?.bundles || []));
+  } catch {}
+  const patch = readYamlSafe(PATCH_FILE);
+  const patchedDisabled = new Set();
+  for (const row of patch) {
+    const m = row.raw.match(/-\s*id:\s*["']?([\w@/.-]+)/);
+    if (m) patchedDisabled.add(m[1]);
+  }
+  for (const p of loaded) {
+    const short = p.replace(/^@deepseek-ai\//, '').replace(/^dsh-/, '');
+    plugins.push({ id: p, name: short, enabled: true, source: 'bundle' });
+  }
+  for (const p of patch) {
+    const m = p.raw.match(/-\s*id:\s*["']?([\w@/.-]+)/);
+    if (!m) continue;
+    plugins.push({ id: m[1], name: m[1], enabled: false, source: 'patch' });
+  }
+  return plugins;
+}
+
+function setPluginEnabled(id, enabled) {
+  try {
+    let content = '';
+    if (fs.existsSync(PATCH_FILE)) content = fs.readFileSync(PATCH_FILE, 'utf8');
+    const rows = content.split(/\r?\n/);
+    const out = [];
+    let found = false;
+    let lastEntryIdx = -1;
+    for (let i = 0; i < rows.length; i++) {
+      const line = rows[i];
+      const t = line.trim();
+      if (t.startsWith('- id:')) lastEntryIdx = out.length;
+    }
+    for (const line of rows) {
+      const t = line.trim();
+      const m = t.match(/^-?\s*id:\s*["']?([\w@/.-]+)/);
+      if (m && m[1] === id) {
+        found = true;
+        if (enabled) continue; // remove entry => enable
+        continue; // keep (already in patch = disabled)
+      }
+      out.push(line);
+    }
+    if (!enabled && !found) {
+      let indent = '  ';
+      if (lastEntryIdx >= 0) {
+        const prev = out[lastEntryIdx];
+        const mm = prev.match(/^(\s*)/);
+        indent = mm ? mm[1] : '  ';
+      }
+      const insertAt = Math.max(0, lastEntryIdx + 1);
+      out.splice(insertAt, 0, `${indent}- id: ${id}\n${indent}  disabled: true`);
+    }
+    fs.writeFileSync(PATCH_FILE, out.join('\n'), 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function computeUsage() {
+  const stats = { sessions: 0, messages: 0, bytes: 0, workspaces: 0 };
+  const sessionsDir = path.join(DSH_HOME, 'sessions');
+  if (fs.existsSync(sessionsDir)) {
+    try {
+      for (const f of fs.readdirSync(sessionsDir, { withFileTypes: true })) {
+        if (!f.isDirectory()) continue;
+        const wsDir = path.join(sessionsDir, f.name);
+        stats.workspaces++;
+        for (const s of fs.readdirSync(wsDir)) {
+          if (!s.startsWith('session-')) continue;
+          const sdir = path.join(wsDir, s);
+          if (!fs.statSync(sdir).isDirectory()) continue;
+          stats.sessions++;
+          for (const sf of fs.readdirSync(sdir)) {
+            const full = path.join(sdir, sf);
+            try { stats.bytes += fs.statSync(full).size; } catch {}
+            if (sf.endsWith('.jsonl') || sf.endsWith('.zstd')) stats.messages++;
+          }
+        }
+      }
+    } catch {}
+  }
+  return stats;
+}
+
+ipcMain.handle('panel:skills', () => listSkills());
+ipcMain.handle('panel:opencode-skills', () => listOpencodeSkills());
+ipcMain.handle('panel:set-skill', (_e, name, enabled) => setSkillEnabled(name, enabled));
+ipcMain.handle('panel:plugins', () => listPlugins());
+ipcMain.handle('panel:set-plugin', (_e, id, enabled) => setPluginEnabled(id, enabled));
+ipcMain.handle('panel:usage', () => computeUsage());
 
 ipcMain.on('check-update', () => checkForUpdate(true));
 ipcMain.on('do-update', () => runUpdate());
