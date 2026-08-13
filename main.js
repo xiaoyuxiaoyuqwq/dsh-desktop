@@ -143,6 +143,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1280,
     height: 860,
+    title: 'dsh 简易封装',
     autoHideMenuBar: true,
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {

@@ -20,7 +20,7 @@
   },
   "build": {
     "appId": "ai.deepseek.dsh.desktop",
-    "productName": "DeepSeek Harness",
+    "productName": "dsh 简易封装",
     "asar": false,
     "npmRebuild": false,
     "directories": {
@@ -58,7 +58,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "DeepSeek Harness"
+      "shortcutName": "dsh 简易封装"
     }
   }
 }
