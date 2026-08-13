@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu } = require('electron');
 const { spawn, execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -6,6 +6,7 @@ const path = require('path');
 const PORT = process.env.DSH_PORT || '0';
 const HOST = process.env.DSH_HOST || '127.0.0.1';
 const NODE_MIN = [22, 19, 0];
+const BOOT_TIMEOUT = 120000;
 const APP_DIR = __dirname;
 const RES_DIR = process.resourcesPath || APP_DIR;
 
@@ -92,23 +93,113 @@ let child = null;
 let win = null;
 let apiUrl = null;
 let updateTimer = null;
+let bootTimer = null;
+
+function showLoadingError(msg) {
+  if (win && !win.isDestroyed()) {
+    win.webContents.executeJavaScript(`window.dshLoading && window.dshLoading.error(${JSON.stringify(String(msg).slice(0, 300))})`).catch(() => {});
+  }
+  console.error('[boot] failed:', msg);
+}
+
+function killTree(proc) {
+  if (!proc || proc.killed) return;
+  try {
+    execFile('taskkill', ['/pid', String(proc.pid), '/T', '/F'], () => {});
+  } catch {
+    try { proc.kill(); } catch {}
+  }
+}
+
+function startBootTimeout() {
+  bootTimer = setTimeout(() => {
+    if (apiUrl) return;
+    const hint = child ? 'dsh 进程已启动但未在预期时间内就绪。' : 'dsh 进程未能启动。';
+    showLoadingError(`${hint} 可能原因：未开启 Windows 开发者模式（首次运行需创建符号链接）、网络不可用、或端口被占用。`);
+  }, BOOT_TIMEOUT);
+}
+
+let devModePrompted = false;
+
+function isDevModeEnabled() {
+  try {
+    const k = require('child_process').execFileSync('reg', [
+      'query', 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock',
+      '/v', 'AllowDevelopmentWithoutDevLicense',
+    ], { encoding: 'utf8', timeout: 5000, windowsHide: true });
+    return /0x1/.test(k);
+  } catch {
+    return false;
+  }
+}
+
+function enableDevModeViaUac() {
+  const cmd = 'reg add "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock" /v AllowDevelopmentWithoutDevLicense /t REG_DWORD /d 1 /f';
+  const ps = spawn('powershell', ['-NoProfile', '-Command', `Start-Process reg -ArgumentList 'add','HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock','/v','AllowDevelopmentWithoutDevLicense','/t','REG_DWORD','/d','1','/f' -Verb RunAs -Wait`], {
+    windowsHide: true,
+    stdio: 'ignore',
+  });
+  ps.on('exit', (code) => {
+    const ok = isDevModeEnabled();
+    if (ok && win && !win.isDestroyed()) {
+      dialog.showMessageBox(win, {
+        type: 'info',
+        message: '开发者模式已开启',
+        detail: '正在重新启动 dsh…',
+      });
+      restartDsh();
+    } else {
+      dialog.showMessageBox(win, {
+        type: 'warning',
+        message: '未能开启开发者模式',
+        detail: '如果刚刚拒绝了 UAC 弹窗，可稍后手动开启：\n设置 → 隐私和安全性 → 开发者选项 → 开发人员模式\n开启后点“重试”。',
+        buttons: ['重试', '退出'],
+      }).then(({ response }) => {
+        if (response === 0) restartDsh();
+        else quitApp();
+      });
+    }
+  });
+}
+
+function promptEnableDevMode() {
+  if (devModePrompted || !win || win.isDestroyed()) return;
+  devModePrompted = true;
+  if (isDevModeEnabled()) return;
+  dialog.showMessageBox(win, {
+    type: 'question',
+    message: '首次运行需要开启 Windows 开发者模式',
+    detail: 'dsh 需要创建符号链接，未开启开发者模式会启动失败。\n是否现在开启？（需要管理员权限，会弹出 UAC 确认）',
+    buttons: ['开启开发者模式', '稍后手动开启', '退出'],
+    defaultId: 0,
+    cancelId: 2,
+  }).then(({ response }) => {
+    if (response === 0) enableDevModeViaUac();
+    else if (response === 1) restartDsh();
+    else quitApp();
+  });
+}
+
+function restartDsh() {
+  devModePrompted = false;
+  if (child) killTree(child);
+  child = null;
+  apiUrl = null;
+  if (win && !win.isDestroyed()) win.loadFile('loading.html');
+  startDsh();
+}
 
 async function startDsh() {
   const node = await findNode();
   if (!node) {
-    dialog.showErrorBox(
-      'Node 版本过低',
-      `需要 Node.js >= ${NODE_MIN.join('.')}。\n请运行 setup.cmd 自动安装便携版，或安装新版 Node.js 后重试。`
-    );
-    app.exit(1);
+    showLoadingError(`需要 Node.js >= ${NODE_MIN.join('.')}，未找到可用版本。`);
     return;
   }
   console.log('[dsh] using node:', node);
 
   const dshBin = dshBinPath();
   if (!dshBin) {
-    dialog.showErrorBox('缺少 dsh', '未找到 @deepseek-ai/dsh，请先运行 setup.cmd 安装依赖。');
-    app.exit(1);
+    showLoadingError('未找到 @deepseek-ai/dsh，请重新安装。');
     return;
   }
 
@@ -118,23 +209,39 @@ async function startDsh() {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
+  startBootTimeout();
+
+  let buf = '';
   child.stdout.on('data', (d) => {
+    buf += String(d);
     const s = String(d);
     if (!apiUrl) {
-      const m = s.match(/http:\/\/[\w.:]+/);
+      const m = buf.match(/http:\/\/[\w.:]+/);
       if (m) {
         apiUrl = m[0];
         console.log('[dsh] listening on', apiUrl);
+        if (bootTimer) clearTimeout(bootTimer);
         if (win) win.loadURL(apiUrl);
       }
     }
     console.log('[dsh]', s.trim());
   });
-  child.stderr.on('data', (d) => console.log('[dsh:err]', String(d).trim()));
+  child.stderr.on('data', (d) => {
+    const s = String(d).trim();
+    console.log('[dsh:err]', s);
+    if (!apiUrl && /error|failed|SyntaxError|Cannot find|EPERM|expose-internals/i.test(s)) {
+      showLoadingError(s.slice(0, 300));
+      if (/EPERM|symlink/i.test(s)) {
+        promptEnableDevMode();
+      }
+    }
+  });
   child.on('exit', (code) => {
     console.log('[dsh] exited with', code);
-    if (!win || win.isDestroyed()) return;
-    win.webContents.reload();
+    if (!apiUrl && bootTimer) clearTimeout(bootTimer);
+    if (win && !win.isDestroyed() && apiUrl) {
+      win.webContents.reload();
+    }
   });
 }
 
@@ -155,12 +262,32 @@ function createWindow() {
 
   win.on('closed', () => {
     win = null;
-    if (child) child.kill();
+    killTree(child);
     app.quit();
   });
 
   if (apiUrl) win.loadURL(apiUrl);
   else win.loadFile('loading.html');
+}
+
+function quitApp() {
+  if (updateTimer) clearInterval(updateTimer);
+  killTree(child);
+  app.quit();
+}
+
+function buildMenu() {
+  const template = [
+    {
+      label: '文件',
+      submenu: [
+        { label: '退出 dsh 简易封装', accelerator: 'Ctrl+Q', click: quitApp },
+      ],
+    },
+    { role: 'editMenu', label: '编辑' },
+    { role: 'viewMenu', label: '视图' },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 let updateAvailable = null;
@@ -201,7 +328,7 @@ function runUpdate() {
     }
     if (code === 0) {
       setTimeout(() => {
-        child && child.kill();
+        killTree(child);
         app.relaunch();
         app.exit(0);
       }, 800);
@@ -218,17 +345,17 @@ ipcMain.on('check-update', () => checkForUpdate(true));
 ipcMain.on('do-update', () => runUpdate());
 
 app.whenReady().then(() => {
+  buildMenu();
   createWindow();
   startDsh();
   startUpdateChecks();
 });
 
 app.on('window-all-closed', () => {
-  if (child) child.kill();
-  app.quit();
+  quitApp();
 });
 
 app.on('before-quit', () => {
   if (updateTimer) clearInterval(updateTimer);
-  if (child) child.kill();
+  killTree(child);
 });

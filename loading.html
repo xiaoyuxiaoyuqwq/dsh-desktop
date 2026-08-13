@@ -4,7 +4,25 @@
 <meta charset="utf-8">
 <style>
   body { margin:0; height:100vh; display:flex; align-items:center; justify-content:center; background:#0b0e17; color:#8b93ab; font-family:system-ui,sans-serif; }
+  #msg { text-align:center; }
+  .err { color:#ff4d4f; }
+  .spinner { width:36px; height:36px; margin:0 auto 16px; border:3px solid #2a3550; border-top-color:#22d3ee; border-radius:50%; animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
 </style>
 </head>
-<body>正在启动 dsh …</body>
+<body>
+<div id="msg">
+  <div class="spinner" id="spin"></div>
+  <div id="text">正在启动 dsh …</div>
+</div>
+<script>
+  window.dshLoading = {
+    error: function (msg) {
+      document.getElementById('spin').style.display = 'none';
+      document.getElementById('text').className = 'err';
+      document.getElementById('text').textContent = '启动失败：' + msg;
+    }
+  };
+</script>
+</body>
 </html>

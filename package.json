@@ -10,7 +10,18 @@
     "build": "node scripts/gen-icon.mjs && electron-builder --win"
   },
   "dependencies": {
-    "@deepseek-ai/dsh": "^0.1.0-rc.6"
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/cordis-plugin-group": "^1.0.1",
+    "@deepseek-ai/cordis-plugin-hmr": "^1.0.16",
+    "@deepseek-ai/cordis-plugin-include": "^1.0.6",
+    "@deepseek-ai/cordis-plugin-loader": "^1.0.2",
+    "@deepseek-ai/cordis-plugin-timer": "^1.1.3",
+    "@deepseek-ai/dsh": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-home-paths": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-invariants": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-launch-environment": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-shell-env": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.6"
   },
   "devDependencies": {
     "electron": "^43.4.0",
@@ -32,6 +43,40 @@
       "loading.html",
       "preload.js",
       "build/icon.png",
+      "node_modules/@deepseek-ai/**/*",
+      "node_modules/cordis*/**/*",
+      "node_modules/cosmokit/**/*",
+      "node_modules/schemastery/**/*",
+      "node_modules/react/**/*",
+      "node_modules/react-dom/**/*",
+      "node_modules/clsx/**/*",
+      "node_modules/loose-envify/**/*",
+      "node_modules/js-tokens/**/*",
+      "node_modules/scheduler/**/*",
+      "node_modules/koffi/**/*",
+      "node_modules/node-pty/**/*",
+      "node_modules/chokidar/**/*",
+      "node_modules/@earendil-works/**/*",
+      "node_modules/@anthropic-ai/**/*",
+      "node_modules/@aws-sdk/**/*",
+      "node_modules/@aws-crypto/**/*",
+      "node_modules/@smithy/**/*",
+      "node_modules/@google/**/*",
+      "node_modules/@hono/**/*",
+      "node_modules/@img/**/*",
+      "node_modules/@joplin/**/*",
+      "node_modules/@mistralai/**/*",
+      "node_modules/@mixmark-io/**/*",
+      "node_modules/@modelcontextprotocol/**/*",
+      "node_modules/@opentelemetry/**/*",
+      "node_modules/@protobufjs/**/*",
+      "node_modules/@shikijs/**/*",
+      "node_modules/@standard-schema/**/*",
+      "node_modules/@tanstack/**/*",
+      "node_modules/@types/**/*",
+      "node_modules/@ungap/**/*",
+      "node_modules/@vscode/**/*",
+      "node_modules/accepts/**/*",
       "node_modules/*"
     ],
     "extraResources": [
@@ -45,11 +90,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -58,7 +107,9 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "dsh 简易封装"
+      "shortcutName": "dsh 简易封装",
+      "runAfterFinish": true,
+      "requestedExecutionLevel": "requireAdministrator"
     }
   }
 }
