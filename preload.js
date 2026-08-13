@@ -124,17 +124,6 @@ async function buildSkills() {
     });
   }
 
-  const ocs = await ipcRenderer.invoke('panel:opencode-skills');
-  if (ocs.length) {
-    el('h4', { style: 'margin-top:12px' }, sec).textContent = 'Skill（opencode，只读）';
-    for (const s of ocs) {
-      const row = el('div', { class: 'row' }, sec);
-      const info = el('div', null, row);
-      el('div', { class: 'r-name' }, info).textContent = s.name;
-      if (s.desc) el('div', { class: 'r-desc' }, info).textContent = s.desc;
-      el('div', { class: 'r-desc' }, row).textContent = '只读';
-    }
-  }
   return sec;
 }
 

@@ -401,33 +401,6 @@ function listSkills() {
   return out;
 }
 
-function listOpencodeSkills() {
-  const dirs = [
-    path.join(app.getPath('home'), '.config', 'opencode', 'skills'),
-  ];
-  const out = [];
-  for (const root of dirs) {
-    if (!fs.existsSync(root)) continue;
-    let entries = [];
-    try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch { continue; }
-    for (const e of entries) {
-      if (!e.isDirectory()) continue;
-      const md = path.join(root, e.name, 'SKILL.md');
-      if (!fs.existsSync(md)) continue;
-      let name = e.name, desc = '';
-      try {
-        const head = fs.readFileSync(md, 'utf8').slice(0, 2000);
-        const m = head.match(/^name:\s*["']?([^"'\r\n]+)/m);
-        if (m) name = m[1].trim();
-        const d = head.match(/^description:\s*["']?([^"'\r\n]+)/m);
-        if (d) desc = d[1].trim();
-      } catch {}
-      out.push({ name, desc, enabled: true, path: md, source: 'opencode', readonly: true });
-    }
-  }
-  return out;
-}
-
 function setSkillEnabled(name, enabled) {
   const root = path.join(DSH_HOME, 'skills');
   if (!fs.existsSync(root)) return false;
@@ -533,7 +506,6 @@ function computeUsage() {
 }
 
 ipcMain.handle('panel:skills', () => listSkills());
-ipcMain.handle('panel:opencode-skills', () => listOpencodeSkills());
 ipcMain.handle('panel:set-skill', (_e, name, enabled) => setSkillEnabled(name, enabled));
 ipcMain.handle('panel:plugins', () => listPlugins());
 ipcMain.handle('panel:set-plugin', (_e, id, enabled) => setPluginEnabled(id, enabled));
