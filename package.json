@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "dsh-desktop",
   "version": "1.0.0",
   "private": true,
@@ -31,7 +31,7 @@
   },
   "build": {
     "appId": "ai.deepseek.dsh.desktop",
-    "productName": "dsh 绠€鏄撳皝瑁?,
+    "productName": "dsh 简易封装",
     "asar": false,
     "npmRebuild": false,
     "directories": {
@@ -44,18 +44,6 @@
       "preload.js",
       "build/icon.png",
       "node_modules/@deepseek-ai/*/**/*",
-      "node_modules/cordis*/**/*",
-      "node_modules/cosmokit/**/*",
-      "node_modules/schemastery/**/*",
-      "node_modules/react/**/*",
-      "node_modules/react-dom/**/*",
-      "node_modules/clsx/**/*",
-      "node_modules/loose-envify/**/*",
-      "node_modules/js-tokens/**/*",
-      "node_modules/scheduler/**/*",
-      "node_modules/koffi/**/*",
-      "node_modules/node-pty/**/*",
-      "node_modules/chokidar/**/*",
       "node_modules/@earendil-works/*/**/*",
       "node_modules/@anthropic-ai/*/**/*",
       "node_modules/@aws-sdk/*/**/*",
@@ -76,6 +64,18 @@
       "node_modules/@types/*/**/*",
       "node_modules/@ungap/*/**/*",
       "node_modules/@vscode/*/**/*",
+      "node_modules/cordis*/**/*",
+      "node_modules/cosmokit/**/*",
+      "node_modules/schemastery/**/*",
+      "node_modules/react/**/*",
+      "node_modules/react-dom/**/*",
+      "node_modules/clsx/**/*",
+      "node_modules/loose-envify/**/*",
+      "node_modules/js-tokens/**/*",
+      "node_modules/scheduler/**/*",
+      "node_modules/koffi/**/*",
+      "node_modules/node-pty/**/*",
+      "node_modules/chokidar/**/*",
       "node_modules/accepts/**/*",
       "node_modules/*"
     ],
@@ -107,7 +107,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "dsh 绠€鏄撳皝瑁?,
+      "shortcutName": "dsh 简易封装",
       "runAfterFinish": true
     }
   }
