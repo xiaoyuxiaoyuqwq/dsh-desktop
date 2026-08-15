@@ -8,7 +8,9 @@
  */
 export const name = 'session-console'
 
-export const inject = []
+// webServer 由 dsh-web-app 的补丁层提供,晚于 profile 补丁层应用:
+// 必须 inject 等待,ctx.get 在 apply 时刻会拿到 undefined(酒馆插件图库路由同因)。
+export const inject = ['webServer']
 
 export function apply(ctx) {
   const tools = ctx.get('tools')
@@ -16,7 +18,7 @@ export function apply(ctx) {
   const agents = ctx.get('agents')
   const sessionQuery = ctx.get('sessionQuery')
   const agentPresets = ctx.get('agentPresets')
-  const webServer = ctx.get('webServer')
+  const webServer = ctx.webServer
 
   const RESERVED = new Set(['read', 'write', 'edit', 'skill', 'todo_write', 'ask_user_question', 'exit_plan_mode'])
 
