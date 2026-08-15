@@ -1,38 +1,46 @@
 # dsh-session-console 会话控制台侧栏
 
-DeepSeek Harness 的右侧悬浮侧栏（动态 Cordis 插件）：对**当前对话**使用的技能（skill）与工具提供快捷功能了解与启用管理，并展示本次对话的动态插件活动时间线。
+DeepSeek Harness 右侧悬浮侧栏：对**当前对话**使用的技能（skill）与工具提供快捷功能了解和启用管理，并展示本次对话的动态插件活动时间线。
 
 ## 功能
 
 | 标签页 | 内容 |
 |---|---|
-| 技能 | 当前会话可见技能列表 + 功能描述 + 「详情」展开完整说明；开关可拦截该技能的 `skill` 调用（本会话生效） |
-| 工具 | 当前会话工具目录 + 说明；开关可拦截该工具的调用（核心工具如 read/write/edit/skill/cordis_* 不可禁用） |
-| 插件 | 本次对话 define/run/stop/undefine 过的动态插件状态卡片 + 活动时间线（停用/启用动态插件需助手执行 `cordis_stop`/`cordis_run`，运行时未向插件代码开放注册表） |
+| 技能 | 当前会话技能列表 + 功能描述 + 「详情」展开完整说明；开关可拦截该技能的 `skill` 调用（按会话分桶） |
+| 工具 | 当前会话工具目录 + 说明；开关可拦截该工具调用（核心工具如 read/write/edit/skill/cordis_* 不可禁用） |
+| 插件 | 本次对话 define/run/stop/undefine 过的动态插件状态卡片 + 活动时间线 |
 
-面板右上角可刷新、可收起为右侧小把手；样式全部使用 `--dsw-*` 主题 token，自动跟随明暗主题。
+面板可刷新、可收起为右侧小把手；样式全部使用 `--dsw-*` 主题 token，自动跟随明暗主题。
 
-## 实现要点（对后续移植有用）
+## 安装（永久，重启后生效）
 
-- 动态插件运行时拿到的 `tools` 是**只读门面**（只有 `register`/`schemas`/`get`），没有 `restrict`/`guard`；
-  本插件改用真实事件 `tools/pre-execute` 瀑布：`next()` 后若判定为 `{ kind: 'allow' }`，命中禁用集合时返回 `{ kind: 'deny', reason: '...' }`。
-- 技能/工具列表来自门面 `skills.list()/skills.get()` 与 `tools.schemas()`；插件活动从 `sessionQuery.listEvents(sessionId)` 还原（`cordis_*` 工具调用事件）。
-- 会话 id 由 Client 通过 `shell.overlay` 槽位的标准 props `useSessions` 取得并随 RPC 传给 Host。
-- 附带 `session_console_probe` 探针工具：回报门面能力并 mount-validate 已安装的 `anchored-standard` 预设（`agentPresets.standingKeyFor`）。
+这是 `dsh.client` 双面插件（宿主半 + 浏览器半），以 web profile 插件方式安装：
 
-## 安装（即时，本进程有效）
+1. 把本目录复制到 `%USERPROFILE%\.dsh\profiles\web\node_modules\dsh-session-console\`（即
+   `~/.dsh/profiles/web/node_modules/dsh-session-console`）。
+2. 在 `~/.dsh/profiles/web/cordis.patch.yml` 的 `- insert:` 列表内加一行：
+   ```yaml
+       - id: session-console
+         name: dsh-session-console
+   ```
+3. 完全重启 dsh（关掉桌面程序重开），右侧栏自动出现。
 
-1. 在任意对话中让模型执行 `cordis_define`：
-   - `code.host` = 本目录 `host.js` 的内容
-   - `code.client` = 本目录 `client.js` 的内容
-   - `plugin.kind: "new"`，`idPrefix` 用 `sbcn`（或任意 3–6 位小写字母）
-2. 返回 `pluginId`/`packageId` 后执行 `cordis_run`（首次用 `mode: "run"`）。
-3. 页面右上角出现「会话控制台」面板。进程重启后需重新定义（动态插件不落盘）。
+在 dsh-desktop 仓库中可用一键脚本：
+```
+scripts\install-session-console.cmd
+```
 
-## 永久化路线
+## 目录结构
 
-动态插件是进程内临时能力。要永久内置到 dsh-desktop 封装，需按 `dsh.client` 双面插件契约移植：
-host 半用 `@deepseek-ai/dsh-typert-protocol` 的 `@Remote` 服务暴露数据，client 半以
-`window.__ModuleLoader__.load({ id, factory })` 形式导出 `{ name, inject, apply }`，
-并在 package.json 声明 `dsh.client` 与 `./client` 导出（参考 `@deepseek-ai/dsh-client-hmr`
-与 `@deepseek-ai/dsh-message-feedback`）。移植后 Host 端可直接使用完整 `tools.restrict`/`tools.guard`。
+- `index.js` — 宿主半：`/session-console/api` 前缀路由（技能/工具列表、开关、插件活动），
+  按 `exec.agent.session.id` 分桶的 `tools/pre-execute` 拦截，`webServer` 路由注册
+- `client.js` — 浏览器半：`window.__ModuleLoader__.load` 包，`require("react")`，
+  注册 `shell.overlay` 槽位，`fetch` 调 API
+- `package.json` — `dsh.client` 声明（platform web / immediately）与 `./client` 导出
+- `dynamic/` — 动态插件版源码（进程内临时安装用，重启失效），供参考与调试
+
+## 动态版（备用安装方式）
+
+`dynamic/host.js` 与 `dynamic/client.js` 可作为动态 Cordis 插件安装（`cordis_define` →
+`cordis_run`），页面立即生效但进程重启后失效。实现要点与永久版一致
+（`tools/pre-execute` 拦截 + 门面 `skills`/`tools.schemas` + `sessionQuery`）。

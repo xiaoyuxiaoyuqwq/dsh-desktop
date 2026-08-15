@@ -90,19 +90,34 @@ portable-node/          便携 Node（运行时生成，不入库）
 右侧控制面板通过 IPC 读取 `~/.dsh` 下的 skill / 插件配置与会话统计，勾选后写回
 `~/.dsh/profiles/web/cordis.patch.yml` 或 skill 目录，不动 dsh 本体。
 
-## 会话控制台侧栏（实验）
+## 会话控制台侧栏
 
-`plugins/session-console/` 是 DSH 网页内的右侧「会话控制台」侧栏（动态 Cordis 插件），
+`plugins/session-console/` 是 DSH 网页内的右侧「会话控制台」侧栏（`dsh.client` 双面插件），
 对**当前对话**使用的技能与工具提供快捷功能了解和启用管理：
 
-- **技能**：当前会话技能列表 + 功能说明 +「详情」全文；开关可拦截该技能的 `skill` 调用
+- **技能**：当前会话技能列表 + 功能说明 +「详情」全文；开关可拦截该技能的 `skill` 调用（按会话生效）
 - **工具**：当前会话工具目录 + 说明；开关可拦截该工具调用（核心工具保护，不可禁用）
 - **插件**：本次对话 define/run/stop/undefine 过的动态插件状态卡片 + 活动时间线
 
-安装（即装即用，进程内有效）：在任意对话中让助手用 `cordis_define` 把
-`plugins/session-console/host.js` 与 `client.js` 分别作为 `code.host` / `code.client`
-定义并 `cordis_run`，页面右上角即出现面板。重启后需重新定义。
+### 安装（永久，重启生效）
 
-永久内置（免重新定义）需按 `dsh.client` 双面插件契约移植，路线与接口参考见
-`plugins/session-console/README.md`。
+双击运行：
+
+```
+scripts\install-session-console.cmd
+```
+
+或手动两步：把 `plugins/session-console` 复制到
+`~/.dsh/profiles/web/node_modules/dsh-session-console\`，并在
+`~/.dsh/profiles/web/cordis.patch.yml` 的 `- insert:` 列表内加：
+
+```yaml
+    - id: session-console
+      name: dsh-session-console
+```
+
+然后完全重启 dsh，右侧栏自动出现。
+
+> 动态版（即装即用、进程重启失效）源码见 `plugins/session-console/dynamic/`：
+> 让助手用 `cordis_define`/`cordis_run` 安装即可，供快速试玩与调试。
 
